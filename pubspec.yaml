@@ -1,0 +1,30 @@
+name: stealth_assistant
+description: A stealth interview assistant that listens, transcribes, and generates answers with code formatting.
+publish_to: "none"
+
+version: 1.0.0
+
+environment:
+  sdk: ">=3.3.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+  http: ^1.2.2
+  provider: ^6.1.2
+  shared_preferences: ^2.3.2
+  speech_to_text: ^7.3.0
+  uuid: ^4.5.1
+  markdown_widget: ^2.3.2   # replaces discontinued flutter_markdown
+  curved_navigation_bar: ^1.0.6 
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/
