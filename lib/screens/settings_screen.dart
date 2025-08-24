@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/theme_provider.dart';
-import '../util/constants.dart';
+import '../utils/constants.dart';
+import '../utils/model_constants.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -11,23 +12,25 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  // ...existing code...
   final _baseCtrl = TextEditingController();
   final _keyCtrl = TextEditingController();
-  final _models = const [
-    'gemma:7b-instruct',
-    'codellama:7b-instruct',
-  ];
+  ModelProvider _selectedProvider = ModelProvider.local;
   String _selectedModel = 'gemma:7b-instruct';
 
   @override
   void initState() {
     super.initState();
     () async {
-      final (base, key, model) = await AppConfig.load();
+      final (base, key, model, provider) = await AppConfig.load();
       _baseCtrl.text = base;
       _keyCtrl.text = key;
-      _selectedModel = _models.contains(model) ? model : 'gemma:7b-instruct';
+      _selectedProvider = ModelProvider.values.firstWhere(
+        (p) => p.name == provider,
+        orElse: () => ModelProvider.local,
+      );
+      final models = kProviderModels[_selectedProvider] ??
+          kProviderModels[ModelProvider.local]!;
+      _selectedModel = models.contains(model) ? model : models.first;
       if (mounted) setState(() {});
     }();
   }
@@ -46,36 +49,71 @@ class _SettingsScreenState extends State<SettingsScreen> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          const Text('Local Model Endpoint',
-              style: TextStyle(fontWeight: FontWeight.bold)),
+          const Text('Provider', style: TextStyle(fontWeight: FontWeight.bold)),
           const SizedBox(height: 8),
-          TextField(
-            controller: _baseCtrl,
+          DropdownButtonFormField<ModelProvider>(
+            value: _selectedProvider,
             decoration: const InputDecoration(
-              labelText: 'Base URL (e.g. http://192.168.0.54:11434)',
+              labelText: 'Provider',
+              border: OutlineInputBorder(),
             ),
+            items: ModelProvider.values
+                .map((p) => DropdownMenuItem(
+                      value: p,
+                      child:
+                          Text(p.name[0].toUpperCase() + p.name.substring(1)),
+                    ))
+                .toList(),
+            onChanged: (provider) {
+              if (provider != null) {
+                setState(() {
+                  _selectedProvider = provider;
+                  final models = kProviderModels[provider] ??
+                      kProviderModels[ModelProvider.local]!;
+                  _selectedModel = models.first;
+                });
+              }
+            },
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 20),
           DropdownButtonFormField<String>(
             value: _selectedModel,
             decoration: const InputDecoration(
               labelText: 'Model',
               border: OutlineInputBorder(),
             ),
-            items: _models
+            items: (kProviderModels[_selectedProvider] ??
+                    kProviderModels[ModelProvider.local]!)
                 .map((m) => DropdownMenuItem(value: m, child: Text(m)))
                 .toList(),
             onChanged: (val) =>
                 setState(() => _selectedModel = val ?? _selectedModel),
           ),
           const SizedBox(height: 20),
-          const Text('Optional API Key',
-              style: TextStyle(fontWeight: FontWeight.bold)),
+          if (_selectedProvider == ModelProvider.local) ...[
+            const Text('Local Model Endpoint',
+                style: TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _baseCtrl,
+              decoration: const InputDecoration(
+                labelText: 'Base URL (e.g. http://192.168.0.54:11434)',
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
+          Text(
+              _selectedProvider == ModelProvider.local
+                  ? 'Optional API Key'
+                  : 'API Key',
+              style: const TextStyle(fontWeight: FontWeight.bold)),
           const SizedBox(height: 8),
           TextField(
             controller: _keyCtrl,
-            decoration: const InputDecoration(
-              labelText: 'API Key (not needed for local Ollama)',
+            decoration: InputDecoration(
+              labelText: _selectedProvider == ModelProvider.local
+                  ? 'API Key (not needed for local Ollama)'
+                  : 'API Key (needed for ${_selectedProvider.name[0].toUpperCase() + _selectedProvider.name.substring(1)})',
             ),
             obscureText: true,
           ),
@@ -86,6 +124,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 baseUrl: _baseCtrl.text.trim(),
                 apiKey: _keyCtrl.text.trim(),
                 model: _selectedModel,
+                provider: _selectedProvider.name,
               );
               if (!mounted) return;
               ScaffoldMessenger.of(context).showSnackBar(

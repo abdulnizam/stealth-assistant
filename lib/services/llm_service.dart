@@ -2,27 +2,32 @@ import 'dart:async'; // TimeoutException
 import 'dart:convert';
 import 'dart:io' show SocketException;
 import 'package:http/http.dart' as http;
+import '../utils/model_constants.dart'
+    show
+        ModelProvider,
+        getProviderEndpoint,
+        getProviderHeaders,
+        buildProviderPayload;
 
 class LlmService {
   LlmService({
-    required this.baseUrl, // e.g. http://192.168.0.54:11434
-    required this.model, // e.g. gemma:7b-instruct / codellama:7b-instruct
-    this.apiKey, // not needed for local Ollama
-    this.numPredict = 384, // max output tokens (you can raise safely)
-    this.numThread = 4, // set to your Mac perf cores
+    required this.provider,
+    required this.model,
+    this.baseUrl = '',
+    this.apiKey,
+    this.numPredict = 384,
+    this.numThread = 4,
     this.keepAlive = const Duration(minutes: 5),
     this.timeout = const Duration(seconds: 45),
-
-    // Tuning knobs (MUTABLE so you can reconfigure at runtime)
     this.retryBackoff = const Duration(seconds: 3),
-    this.tokensPerSecondGuess = 18.0, // conservative decode speed guess
+    this.tokensPerSecondGuess = 18.0,
     this.timeoutOverhead = const Duration(seconds: 3),
-    this.timeoutRetryDegrade = 0.65, // on timeout, num_predict *= 0.65
+    this.timeoutRetryDegrade = 0.65,
   });
 
-  // Core config (mutable)
-  String baseUrl;
+  ModelProvider provider;
   String model;
+  String baseUrl;
   final String? apiKey;
 
   int numPredict;
@@ -30,7 +35,6 @@ class LlmService {
   Duration keepAlive;
   Duration timeout;
 
-  // Adaptive/behavior knobs (mutable)
   Duration retryBackoff;
   double tokensPerSecondGuess;
   Duration timeoutOverhead;
@@ -39,19 +43,24 @@ class LlmService {
   // ----------------- helpers -----------------
 
   Uri _generateUri() {
-    var base = baseUrl.trim();
-    if (base.isEmpty)
-      throw StateError('Base URL is empty. Set it in Settings.');
-    if (base.endsWith('/')) base = base.substring(0, base.length - 1);
-    if (!base.endsWith('/api/generate')) base = '$base/api/generate';
-    return Uri.parse(base);
+    if (provider == ModelProvider.local) {
+      var base = baseUrl.trim();
+      if (base.isEmpty) {
+        throw StateError('Base URL is empty. Set it in Settings.');
+      }
+      if (base.endsWith('/')) base = base.substring(0, base.length - 1);
+      if (!base.endsWith('/api/generate')) base = '$base/api/generate';
+      return Uri.parse(base);
+    } else if (provider == ModelProvider.gemini) {
+      // Gemini endpoint needs model in path
+      return Uri.parse(
+          '${getProviderEndpoint(provider)}/$model:generateContent');
+    } else {
+      return Uri.parse(getProviderEndpoint(provider));
+    }
   }
 
-  Map<String, String> _headers() => {
-        'Content-Type': 'application/json',
-        if (apiKey != null && apiKey!.isNotEmpty)
-          'Authorization': 'Bearer $apiKey',
-      };
+  Map<String, String> _headers() => getProviderHeaders(provider, apiKey);
 
   String _keepAliveToString() {
     final s = keepAlive.inSeconds;
@@ -75,75 +84,50 @@ class LlmService {
   // ----------------- public API -----------------
 
   /// Non-streaming generate that auto-adjusts timeout and retries once on timeout.
+
   Future<String> generate(String prompt) async {
     final uri = _generateUri();
-
-    // Attempt 1
-    final attempt1Predict = numPredict;
-    final attempt1Timeout = _adaptiveTimeout(attempt1Predict);
-    // Optional: debug log
-    // ignore: avoid_print
-    print(
-        '[LlmService] POST $uri model=$model np=$attempt1Predict timeout=${attempt1Timeout.inSeconds}s');
-
-    final body1 = jsonEncode({
-      'model': model,
-      'prompt': prompt,
-      'stream': false,
-      'keep_alive': _keepAliveToString(),
-      'options': {
-        'num_predict': attempt1Predict,
-        'num_thread': numThread,
-      },
-    });
+    final payload = buildProviderPayload(provider, model, prompt, numPredict);
+    final body = jsonEncode(payload);
 
     try {
-      final res = await _postWithTimeout(uri, body1, attempt1Timeout);
+      final res = await http
+          .post(uri, headers: _headers(), body: body)
+          .timeout(timeout);
       if (res.statusCode < 200 || res.statusCode >= 300) {
-        throw Exception('LLM error: ${res.statusCode} ${res.body}');
+        throw Exception(
+            '${provider.name} error: ${res.statusCode} ${res.body}');
       }
-      final map = jsonDecode(res.body) as Map<String, dynamic>;
-      final resp = map['response'];
-      if (resp is String && resp.isNotEmpty) return resp;
-      return (map['text'] ?? map['answer'] ?? map['message'] ?? '').toString();
+      final data = jsonDecode(res.body);
+      // Parse response for each provider
+      switch (provider) {
+        case ModelProvider.openai:
+        case ModelProvider.mistral:
+        case ModelProvider.groq:
+          return data["choices"]?[0]?["message"]?["content"]?.toString() ?? '';
+        case ModelProvider.anthropic:
+          return data["content"]?.toString() ?? '';
+        case ModelProvider.gemini:
+          return data["candidates"]?[0]?["content"]?["parts"]?[0]?["text"]
+                  ?.toString() ??
+              '';
+        case ModelProvider.cohere:
+          return data["text"]?.toString() ?? '';
+        case ModelProvider.local:
+        default:
+          final resp = data['response'];
+          if (resp is String && resp.isNotEmpty) return resp;
+          return (data['text'] ?? data['answer'] ?? data['message'] ?? '')
+              .toString();
+      }
     } on TimeoutException catch (e) {
-      // Attempt 2 (degraded num_predict)
-      final attempt2Predict =
-          (attempt1Predict * timeoutRetryDegrade).floor().clamp(32, 4096);
-      final attempt2Timeout = _adaptiveTimeout(attempt2Predict);
-      // ignore: avoid_print
-      print(
-          '[LlmService] Timeout after ${attempt1Timeout.inSeconds}s; retrying with '
-          'np=$attempt2Predict timeout=${attempt2Timeout.inSeconds}s (err=$e)');
-
-      await Future.delayed(retryBackoff);
-
-      final body2 = jsonEncode({
-        'model': model,
-        'prompt': prompt,
-        'stream': false,
-        'keep_alive': _keepAliveToString(),
-        'options': {
-          'num_predict': attempt2Predict,
-          'num_thread': numThread,
-        },
-      });
-
-      final res2 = await _postWithTimeout(uri, body2, attempt2Timeout);
-      if (res2.statusCode < 200 || res2.statusCode >= 300) {
-        throw Exception('LLM error (retry): ${res2.statusCode} ${res2.body}');
-      }
-      final map2 = jsonDecode(res2.body) as Map<String, dynamic>;
-      final resp2 = map2['response'];
-      if (resp2 is String && resp2.isNotEmpty) return resp2;
-      return (map2['text'] ?? map2['answer'] ?? map2['message'] ?? '')
-          .toString();
+      throw Exception('${provider.name} timeout: $e');
     } on SocketException catch (e) {
-      throw Exception('Cannot reach Ollama at $uri — network error: $e');
+      throw Exception('Cannot reach ${provider.name} — network error: $e');
     } on FormatException catch (e) {
-      throw Exception('Bad response format from $uri — $e');
+      throw Exception('Bad response format from ${provider.name} — $e');
     } catch (e) {
-      throw Exception('Unexpected error calling $uri — $e');
+      throw Exception('Unexpected error calling ${provider.name} — $e');
     }
   }
 

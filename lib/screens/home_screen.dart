@@ -5,7 +5,8 @@ import '../models/message.dart';
 import '../services/storage_service.dart';
 import '../services/speech_service.dart';
 import '../services/llm_service.dart';
-import '../util/constants.dart';
+import '../utils/model_constants.dart';
+import '../utils/constants.dart';
 import '../widgets/markdown_message.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -66,10 +67,15 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
     // 2) Always reload latest model config before sending
     String answer = '';
     try {
-      final (base, key, model) = await AppConfig.load();
+      final (base, key, model, provider) = await AppConfig.load();
+      final modelProvider = ModelProvider.values.firstWhere(
+        (p) => p.name == provider,
+        orElse: () => ModelProvider.local,
+      );
       _llm = LlmService(
+        provider: modelProvider,
         baseUrl: base,
-        apiKey: key.isEmpty ? null : key,
+        apiKey: (key.isEmpty) ? null : key,
         model: model,
       );
       if (_llm == null) {
@@ -172,12 +178,17 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
 
   Future<void> _bootstrap() async {
     await _speech.init();
-    final (base, key, model) = await AppConfig.load();
+    final (base, key, model, provider) = await AppConfig.load();
+    final modelProvider = ModelProvider.values.firstWhere(
+      (p) => p.name == provider,
+      orElse: () => ModelProvider.local,
+    );
     setState(() {
       _llm = LlmService(
-        baseUrl: base, // e.g. http://192.168.0.54:11434
-        apiKey: key.isEmpty ? null : key,
-        model: model, // e.g. gemma:7b-instruct / codellama:7b-instruct
+        provider: modelProvider,
+        baseUrl: base,
+        apiKey: (key.isEmpty) ? null : key,
+        model: model,
       );
     });
   }
