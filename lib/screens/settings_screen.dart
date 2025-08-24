@@ -120,9 +120,31 @@ class _SettingsScreenState extends State<SettingsScreen> {
           const SizedBox(height: 20),
           FilledButton(
             onPressed: () async {
+              final apiKey = _keyCtrl.text.trim();
+              final baseUrl = _baseCtrl.text.trim();
+              if (_selectedProvider == ModelProvider.local) {
+                if (baseUrl.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                        content:
+                            Text('Endpoint is mandatory for local provider.')),
+                  );
+                  return;
+                }
+                // API key is optional for local
+              } else {
+                if (apiKey.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                        content:
+                            Text('API key is mandatory for this provider.')),
+                  );
+                  return;
+                }
+              }
               await AppConfig.save(
-                baseUrl: _baseCtrl.text.trim(),
-                apiKey: _keyCtrl.text.trim(),
+                baseUrl: baseUrl,
+                apiKey: apiKey,
                 model: _selectedModel,
                 provider: _selectedProvider.name,
               );
