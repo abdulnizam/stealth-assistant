@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+
 import 'package:curved_navigation_bar/curved_navigation_bar.dart';
 import 'package:provider/provider.dart';
+import 'package:animations/animations.dart';
 import 'providers/theme_provider.dart';
 
 import 'screens/home_screen.dart';
@@ -27,9 +29,86 @@ class StealthAssistantApp extends StatelessWidget {
             theme: AppTheme.light(themeProvider.primaryColor),
             darkTheme: AppTheme.dark(themeProvider.primaryColor),
             themeMode: themeProvider.themeMode,
-            home: const _RootTabs(),
+            home: const SplashToHome(),
           );
         },
+      ),
+    );
+  }
+}
+
+class SplashToHome extends StatefulWidget {
+  const SplashToHome({super.key});
+
+  @override
+  State<SplashToHome> createState() => _SplashToHomeState();
+}
+
+class _SplashToHomeState extends State<SplashToHome>
+    with SingleTickerProviderStateMixin {
+  bool _showHome = false;
+
+  @override
+  void initState() {
+    super.initState();
+    Future.delayed(const Duration(milliseconds: 1400), () {
+      if (mounted) setState(() => _showHome = true);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return PageTransitionSwitcher(
+      duration: const Duration(milliseconds: 900),
+      reverse: false,
+      transitionBuilder: (child, animation, secondaryAnimation) =>
+          FadeThroughTransition(
+        animation: animation,
+        secondaryAnimation: secondaryAnimation,
+        child: child,
+      ),
+      child: _showHome ? const _RootTabs() : const _SplashScreen(),
+    );
+  }
+}
+
+class _SplashScreen extends StatelessWidget {
+  const _SplashScreen();
+
+  @override
+  Widget build(BuildContext context) {
+    final color = Theme.of(context).colorScheme.primary;
+    return Scaffold(
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      body: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 90,
+              height: 90,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: color.withOpacity(0.12),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Image.asset(
+                  'assets/icon.png',
+                  fit: BoxFit.contain,
+                ),
+              ),
+            ),
+            const SizedBox(height: 24),
+            Text(
+              'Stealth Assistant',
+              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                    color: color,
+                    fontWeight: FontWeight.bold,
+                  ),
+            ),
+          ],
+        ),
       ),
     );
   }
