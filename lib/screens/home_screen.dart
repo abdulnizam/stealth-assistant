@@ -68,6 +68,7 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
     String answer = '';
     try {
       final (base, key, model, provider) = await AppConfig.load();
+      final numPredict = await AppConfig.loadNumPredict();
       final modelProvider = ModelProvider.values.firstWhere(
         (p) => p.name == provider,
         orElse: () => ModelProvider.local,
@@ -77,6 +78,7 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
         baseUrl: base,
         apiKey: (key.isEmpty) ? null : key,
         model: model,
+        numPredict: numPredict ?? 384,
       );
       if (_llm == null) {
         answer =
@@ -179,6 +181,7 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
   Future<void> _bootstrap() async {
     await _speech.init();
     final (base, key, model, provider) = await AppConfig.load();
+    final numPredict = await AppConfig.loadNumPredict();
     final modelProvider = ModelProvider.values.firstWhere(
       (p) => p.name == provider,
       orElse: () => ModelProvider.local,
@@ -189,6 +192,7 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
         baseUrl: base,
         apiKey: (key.isEmpty) ? null : key,
         model: model,
+        numPredict: numPredict ?? 384,
       );
     });
   }

@@ -1,3 +1,33 @@
+/// Converts a GPT-5 response to the legacy OpenAI structure for UI compatibility.
+Map<String, dynamic> convertGpt5ResponseToLegacy(Map<String, dynamic> gpt5) {
+  // Defensive: ensure choices/message/content exist
+  final choices = gpt5['choices'] as List?;
+  final firstChoice =
+      (choices != null && choices.isNotEmpty) ? choices[0] : null;
+  final message = firstChoice != null
+      ? firstChoice['message'] as Map<String, dynamic>?
+      : null;
+  final content = message != null ? message['content'] : null;
+
+  return {
+    'id': gpt5['id'],
+    'object': gpt5['object'] ?? 'chat.completion',
+    'created': gpt5['created'],
+    'model': gpt5['model'],
+    'choices': [
+      {
+        'index': 0,
+        'finish_reason':
+            firstChoice != null ? firstChoice['finish_reason'] : null,
+        'message': {
+          'role': message != null ? message['role'] : 'assistant',
+          'content': content ?? '',
+        },
+      }
+    ],
+    'usage': gpt5['usage'] ?? {},
+  };
+}
 // Model constants, endpoints, and payload builders for all LLM providers
 
 // Enum for all supported LLM providers
@@ -18,7 +48,9 @@ const Map<ModelProvider, List<String>> kProviderModels = {
     'codellama:7b-instruct',
   ],
   ModelProvider.openai: [
-    'gpt-4o',
+    'gpt-5',
+    'gpt-5-mini',
+    'gpt-5-nano',
     'gpt-4o-mini',
     'gpt-3.5-turbo',
   ],
@@ -108,6 +140,23 @@ Object buildProviderPayload(
     ModelProvider provider, String model, String prompt, int maxTokens) {
   switch (provider) {
     case ModelProvider.openai:
+      // Use 'max_completion_tokens' for gpt-5 models, 'max_tokens' otherwise
+      final isGpt5 = model == 'gpt-5' || model.startsWith('gpt-5-');
+      return {
+        "model": model,
+        "messages": [
+          {"role": "system", "content": "You are a helpful assistant."},
+          {"role": "user", "content": prompt},
+        ],
+        if (isGpt5) ...{
+          "max_completion_tokens": maxTokens,
+          "verbosity": "medium",
+          "reasoning_effort": "minimal",
+        } else ...{
+          "temperature": 0.7,
+          "max_tokens": maxTokens,
+        }
+      };
     case ModelProvider.mistral:
     case ModelProvider.groq:
       return {

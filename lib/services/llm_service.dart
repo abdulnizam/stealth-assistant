@@ -2,12 +2,7 @@ import 'dart:async'; // TimeoutException
 import 'dart:convert';
 import 'dart:io' show SocketException;
 import 'package:http/http.dart' as http;
-import '../utils/model_constants.dart'
-    show
-        ModelProvider,
-        getProviderEndpoint,
-        getProviderHeaders,
-        buildProviderPayload;
+import '../utils/model_constants.dart';
 
 class LlmService {
   LlmService({
@@ -29,7 +24,6 @@ class LlmService {
   String model;
   String baseUrl;
   final String? apiKey;
-
   int numPredict;
   int numThread;
   Duration keepAlive;
@@ -89,7 +83,7 @@ class LlmService {
     final uri = _generateUri();
     final payload = buildProviderPayload(provider, model, prompt, numPredict);
     final body = jsonEncode(payload);
-
+    // print("[GPT-5 DEBUG] request payload: " + body);
     try {
       final res = await http
           .post(uri, headers: _headers(), body: body)
@@ -102,6 +96,14 @@ class LlmService {
       // Parse response for each provider
       switch (provider) {
         case ModelProvider.openai:
+          // If gpt-5 or gpt-5-* model, convert to legacy structure
+          if (model == 'gpt-5' || model.startsWith('gpt-5-')) {
+            final legacy = convertGpt5ResponseToLegacy(data);
+            final content =
+                legacy["choices"]?[0]?["message"]?["content"]?.toString() ?? '';
+            return content;
+          }
+          return data["choices"]?[0]?["message"]?["content"]?.toString() ?? '';
         case ModelProvider.mistral:
         case ModelProvider.groq:
           return data["choices"]?[0]?["message"]?["content"]?.toString() ?? '';
@@ -114,7 +116,6 @@ class LlmService {
         case ModelProvider.cohere:
           return data["text"]?.toString() ?? '';
         case ModelProvider.local:
-        default:
           final resp = data['response'];
           if (resp is String && resp.isNotEmpty) return resp;
           return (data['text'] ?? data['answer'] ?? data['message'] ?? '')
