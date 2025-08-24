@@ -8,23 +8,71 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:stealth_assistant/main.dart';
+import 'package:stealth_assistant/screens/settings_screen.dart';
+import 'package:provider/provider.dart';
+import 'package:stealth_assistant/services/storage_service.dart';
+import 'package:stealth_assistant/providers/theme_provider.dart';
+import 'package:stealth_assistant/models/message.dart';
+
+class MockStorageService extends ChangeNotifier implements StorageService {
+  @override
+  bool get isReady => true;
+  @override
+  List<Message> get messages => <Message>[];
+  @override
+  Future<void> init() async {}
+  @override
+  Future<void> addMessage(role, content) async {}
+  @override
+  Future<void> clear() async {}
+}
+
+class MockThemeProvider extends ChangeNotifier implements ThemeProvider {
+  Color _primaryColor = colorOptions[0];
+  ThemeMode _themeMode = ThemeMode.system;
+  @override
+  Color get primaryColor => _primaryColor;
+  @override
+  ThemeMode get themeMode => _themeMode;
+  @override
+  void setTheme(ThemeMode mode) {
+    _themeMode = mode;
+    notifyListeners();
+  }
+
+  @override
+  void setPrimaryColor(Color color) {
+    _primaryColor = color;
+    notifyListeners();
+  }
+}
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+  testWidgets('App renders and theme can be changed',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider<ThemeProvider>(
+              create: (_) => MockThemeProvider()),
+        ],
+        child: const MaterialApp(
+          home: SettingsScreen(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+    // Should find the Theme dropdown
+    expect(find.text('Theme'), findsWidgets);
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
-
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    // Should find the Primary Color section
+    expect(find.text('Primary Color'), findsOneWidget);
+    // Tap the first color option
+    final colorCircle = find.byType(CircleAvatar).first;
+    await tester.tap(colorCircle);
+    await tester.pumpAndSettle();
+    // Should show check icon in the selected color
+    expect(find.byIcon(Icons.check), findsWidgets);
   });
 }
