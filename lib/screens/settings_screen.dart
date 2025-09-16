@@ -251,6 +251,52 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 );
               },
             ),
+            const SizedBox(height: 20),
+            const Text('Links Color',
+                style: TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            Consumer<ThemeProvider>(
+              builder: (context, themeProvider, _) {
+                return Wrap(
+                  spacing: 8,
+                  children: colorOptions.map((color) {
+                    return GestureDetector(
+                      onTap: () => themeProvider.setPathColor(color),
+                      child: CircleAvatar(
+                        backgroundColor: color,
+                        radius: 18,
+                        child: themeProvider.pathColor == color
+                            ? const Icon(Icons.check, color: Colors.white)
+                            : null,
+                      ),
+                    );
+                  }).toList(),
+                );
+              },
+            ),
+            const SizedBox(height: 20),
+            const Text('Code Color',
+                style: TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            Consumer<ThemeProvider>(
+              builder: (context, themeProvider, _) {
+                return Wrap(
+                  spacing: 8,
+                  children: colorOptions.map((color) {
+                    return GestureDetector(
+                      onTap: () => themeProvider.setCodeColor(color),
+                      child: CircleAvatar(
+                        backgroundColor: color,
+                        radius: 18,
+                        child: themeProvider.codeColor == color
+                            ? const Icon(Icons.check, color: Colors.white)
+                            : null,
+                      ),
+                    );
+                  }).toList(),
+                );
+              },
+            ),
           ],
         ),
       ),

@@ -34,6 +34,7 @@ Map<String, dynamic> convertGpt5ResponseToLegacy(Map<String, dynamic> gpt5) {
 enum ModelProvider {
   local,
   openai,
+  perplexity,
   anthropic,
   gemini,
   cohere,
@@ -53,6 +54,10 @@ const Map<ModelProvider, List<String>> kProviderModels = {
     'gpt-5-nano',
     'gpt-4o-mini',
     'gpt-3.5-turbo',
+  ],
+  ModelProvider.perplexity: [
+    'sonar-pro',
+    'sonar',
   ],
   ModelProvider.anthropic: [
     'claude-3-opus-20240229',
@@ -95,6 +100,8 @@ String getProviderEndpoint(ModelProvider provider) {
       return 'https://api.mistral.ai/v1/chat/completions';
     case ModelProvider.groq:
       return 'https://api.groq.com/openai/v1/chat/completions';
+    case ModelProvider.perplexity:
+      return 'https://api.perplexity.ai/chat/completions';
     case ModelProvider.local:
       return '';
   }
@@ -106,6 +113,7 @@ Map<String, String> getProviderHeaders(ModelProvider provider, String? apiKey) {
     case ModelProvider.openai:
     case ModelProvider.mistral:
     case ModelProvider.groq:
+    case ModelProvider.perplexity:
       return {
         'Content-Type': 'application/json',
         if (apiKey != null && apiKey.isNotEmpty)
@@ -156,6 +164,14 @@ Object buildProviderPayload(
           "temperature": 0.7,
           "max_tokens": maxTokens,
         }
+      };
+    case ModelProvider.perplexity:
+      return {
+        "model": model,
+        "messages": [
+          {"role": "system", "content": "You are a helpful assistant."},
+          {"role": "user", "content": prompt},
+        ],
       };
     case ModelProvider.mistral:
     case ModelProvider.groq:

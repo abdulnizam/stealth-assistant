@@ -3,7 +3,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 // List of color options for user to pick
 const List<Color> colorOptions = [
-  Color(0xFF4F46E5), // Indigo
   Colors.deepPurple,
   Colors.teal,
   Colors.pink,
@@ -11,11 +10,16 @@ const List<Color> colorOptions = [
   Colors.green,
   Colors.blue,
   Colors.red,
+  Colors.black
 ];
 
 class ThemeProvider extends ChangeNotifier {
   Color _primaryColor = colorOptions[0];
+  Color _pathColor = colorOptions[0];
+  Color _codeColor = colorOptions[0];
   Color get primaryColor => _primaryColor;
+  Color get pathColor => _pathColor;
+  Color get codeColor => _codeColor;
 
   ThemeMode _themeMode = ThemeMode.system;
 
@@ -39,6 +43,20 @@ class ThemeProvider extends ChangeNotifier {
     prefs.setInt('primary_color', color.value);
   }
 
+  void setPathColor(Color color) async {
+    _pathColor = color;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    prefs.setInt('path_color', color.value);
+  }
+
+  void setCodeColor(Color color) async {
+    _codeColor = color;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    prefs.setInt('code_color', color.value);
+  }
+
   void _loadTheme() async {
     final prefs = await SharedPreferences.getInstance();
     final mode = prefs.getString('theme_mode');
@@ -52,6 +70,14 @@ class ThemeProvider extends ChangeNotifier {
     final colorValue = prefs.getInt('primary_color');
     if (colorValue != null) {
       _primaryColor = Color(colorValue);
+    }
+    final pathColorValue = prefs.getInt('path_color');
+    if (pathColorValue != null) {
+      _pathColor = Color(pathColorValue);
+    }
+    final codeColorValue = prefs.getInt('code_color');
+    if (codeColorValue != null) {
+      _codeColor = Color(codeColorValue);
     }
     notifyListeners();
   }

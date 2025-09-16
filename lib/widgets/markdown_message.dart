@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:provider/provider.dart';
+import '../providers/theme_provider.dart';
 
 class MarkdownMessage extends StatelessWidget {
   const MarkdownMessage({
@@ -82,7 +84,10 @@ class _SelectableMarkdown extends StatelessWidget {
   Widget build(BuildContext context) {
     // Split text into blocks: code blocks (```...```) and normal markdown
     final blocks = _splitMarkdownBlocks(text);
+    final codeColor = Provider.of<ThemeProvider>(context).codeColor;
+
     List<Widget> widgets = [];
+
     for (final block in blocks) {
       if (block['type'] == 'code') {
         final code = block['text'] as String;
@@ -100,10 +105,10 @@ class _SelectableMarkdown extends StatelessWidget {
                   padding: const EdgeInsets.fromLTRB(12, 12, 40, 12),
                   child: SelectableText(
                     code,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontFamily: 'monospace',
                       fontSize: 15,
-                      color: Colors.deepPurple,
+                      color: codeColor,
                     ),
                   ),
                 ),
@@ -176,6 +181,8 @@ List<Map<String, Object>> _splitMarkdownBlocks(String text) {
 
 List<InlineSpan> _parseMarkdown(String text, BuildContext context) {
   final List<InlineSpan> spans = [];
+  final pathColor = Provider.of<ThemeProvider>(context).pathColor;
+
   final RegExp exp =
       RegExp(r'(\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`|\[[^\]]+\]\([^\)]+\))');
   int last = 0;
@@ -196,8 +203,7 @@ List<InlineSpan> _parseMarkdown(String text, BuildContext context) {
     } else if (match.startsWith('`') && match.endsWith('`')) {
       spans.add(TextSpan(
           text: match.substring(1, match.length - 1),
-          style: const TextStyle(
-              fontFamily: 'monospace', color: Colors.deepPurple)));
+          style: TextStyle(fontFamily: 'monospace', color: pathColor)));
     } else if (match.startsWith('[') &&
         match.contains('](') &&
         match.endsWith(')')) {

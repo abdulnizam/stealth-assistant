@@ -106,6 +106,7 @@ class LlmService {
           return data["choices"]?[0]?["message"]?["content"]?.toString() ?? '';
         case ModelProvider.mistral:
         case ModelProvider.groq:
+        case ModelProvider.perplexity:
           return data["choices"]?[0]?["message"]?["content"]?.toString() ?? '';
         case ModelProvider.anthropic:
           return data["content"]?.toString() ?? '';
